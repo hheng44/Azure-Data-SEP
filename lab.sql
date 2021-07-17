@@ -69,7 +69,7 @@ WHERE purchase_quantity > sales_quantity
 */
 
 
-
+/*
 --3rd
 
 SELECT SUM(t2.Quantity * t2.UnitPrice * sd.DiscountPercentage / 100) possible_loss
@@ -91,7 +91,7 @@ ON t1.StockItemID = t2.StockItemID
 JOIN Sales.SpecialDeals sd
 ON t2.BuyingGroupID = sd.BuyingGroupID
 WHERE t2.OrderDate BETWEEN sd.StartDate and sd.EndDate
-
+*/
 
 
 
@@ -186,3 +186,49 @@ GROUP BY JSON_VALUE(CustomFields, '$.CountryOfManufacture')
 
 
 
+--lab3
+--1st
+/*
+SELECT CustomerID, MAX(ConfirmedDeliveryTime) latest_incident
+FROM Sales.Invoices
+WHERE JSON_VALUE (ReturnedDeliveryData, '$.Events[1].Comment') IS NOT NULL
+GROUP BY CustomerID
+ORDER BY MAX(ConfirmedDeliveryTime)
+*/
+
+--2nd
+SELECT t2.CustomerID, num_order
+FROM 
+	(SELECT  c.CustomerID, c.CustomerName
+	FROM Sales.Customers c
+	WHERE c.BuyingGroupID is Null) t1
+JOIN 
+	(SELECT i.CustomerID, COUNT(*) num_order
+	FROM Sales.Orders o
+	JOIN Sales.Invoices i
+	ON i.OrderID = o.OrderID
+	WHERE DATEDIFF(day, o.OrderDate, i.ConfirmedDeliveryTime) > 7
+	GROUP BY i.CustomerID) t2
+ON t1.CustomerID = t2.CustomerID
+
+
+
+--3rd
+/*
+WITH t1 AS(SELECT sisg.StockGroupID, DATEPART(year, o.OrderDate) years, ol.Quantity
+	FROM Sales.OrderLines ol
+	JOIN Sales.Orders o
+	ON ol.OrderID = o.OrderID
+	JOIN Warehouse.StockItemStockGroups sisg
+	ON ol.StockItemID = sisg.StockItemID
+	)
+
+
+SELECT StockGroupID total_number, [SELECT years, COUNT(*) cou from t1 group by years]
+FROM 
+	t1
+PIVOT(
+	SUM(Quantity)
+	for years in ([SELECT years , count(*) cou from t1 group by years])
+	) pivot_table
+*/
