@@ -1,10 +1,25 @@
-SELECT DISTINCT sa.StockItemID, sa.StockItemName, st.TransactionOccurredWhen
-FROM [WideWorldImporters].[Warehouse].[StockItems_Archive] sa
-JOIN [WideWorldImporters].[Warehouse].[StockItemTransactions] st
-ON sa.StockItemID = st.StockItemID
-JOIN [WideWorldImporters].[Application].[People] p
-ON p.PersonID = st.LastEditedBy
-JOIN [WideWorldImporters].[Application].[StateProvinces] sp
-ON p.PersonID = sp.LastEditedBy
-WHERE sp.StateProvinceName not in ('Alabama', 'Georgia ') and DATEPART(year, st.TransactionOccurredWhen) = '2014'
-ORDER BY st.TransactionOccurredWhen
+WITH t1 AS (SELECT s.StateProvinceID, c.CityID, c.CityName
+FROM Application.StateProvinces s
+JOIN Application.Cities c
+ON s.StateProvinceID = c.StateProvinceID
+WHERE s.StateProvinceName NOT IN( 'Alabama', 'Georgia'))
+
+
+SELECT s.StockItemName, s.StockItemID
+FROM
+	(SELECT ol.StockItemID
+	FROM Sales.OrderLines ol
+	JOIN Sales.Orders o
+	ON ol.OrderID = o.OrderID
+	JOIN Sales.Customers c
+	ON o.CustomerID = c.CustomerID
+	JOIN t1
+	ON c.PostalCityID = t1.CityID
+	WHERE year(o.OrderDate) <> 2014 
+	GROUP BY ol.StockItemID)t2
+JOIN Warehouse.StockItems s
+ON t2.StockItemID = s.StockItemID
+
+
+
+

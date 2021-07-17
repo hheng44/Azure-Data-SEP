@@ -1,5 +1,6 @@
-SELECT s.CustomerID, s.CustomerName
+SELECT c.CustomerID, c.CustomerName
 FROM Application.People p
-JOIN Sales.Customers s
-ON p.PersonID = s.PrimaryContactPersonID
-where p.PhoneNumber = s.PhoneNumber
+JOIN Sales.Customers c
+ON p.PersonID = c.PrimaryContactPersonID
+where p.PhoneNumber = c.PhoneNumber AND c.BuyingGroupID IS NOT NULL
+
