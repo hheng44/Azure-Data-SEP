@@ -214,21 +214,35 @@ ON t1.CustomerID = t2.CustomerID
 
 
 --3rd
-/*
-WITH t1 AS(SELECT sisg.StockGroupID, DATEPART(year, o.OrderDate) years, ol.Quantity
-	FROM Sales.OrderLines ol
-	JOIN Sales.Orders o
-	ON ol.OrderID = o.OrderID
-	JOIN Warehouse.StockItemStockGroups sisg
-	ON ol.StockItemID = sisg.StockItemID
-	)
+DECLARE @ColumnList VARCHAR(255)
+SET @ColumnList = NULL 
+
+SELECT @ColumnList =  COALESCE( @ColumnList + ',', '') + QUOTENAME( DATEPART(yy, o.OrderDate)) 
+FROM Sales.Orders o
+GROUP BY DATEPART(yy, o.OrderDate)
+
+SELECT @ColumnList 
+
+DECLARE @SqlQuery NVARCHAR(MAX)
+SET @SqlQuery = 
+	'SELECT StockGroupID total_number, '+@ColumnList+'
+	FROM 
+		(SELECT sisg.StockGroupID, DATEPART(year, o.OrderDate) years, ol.Quantity
+		FROM Sales.OrderLines ol
+		JOIN Sales.Orders o
+		ON ol.OrderID = o.OrderID
+		JOIN Warehouse.StockItemStockGroups sisg
+		ON ol.StockItemID = sisg.StockItemID
+		) source_table
+	PIVOT(
+		SUM(Quantity)
+		FOR years IN ('+@ColumnList+')
+		) pivot_table '
+
+EXEC(@SqlQuery)
 
 
-SELECT StockGroupID total_number, [SELECT years, COUNT(*) cou from t1 group by years]
-FROM 
-	t1
-PIVOT(
-	SUM(Quantity)
-	for years in ([SELECT years , count(*) cou from t1 group by years])
-	) pivot_table
-*/
+
+
+	
+
