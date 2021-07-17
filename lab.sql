@@ -197,23 +197,21 @@ ORDER BY MAX(ConfirmedDeliveryTime)
 */
 
 --2nd
-SELECT t2.CustomerID, num_order
+SELECT t1.SalespersonPersonID, p.FullName, t1.num_delivery
 FROM 
-	(SELECT  c.CustomerID, c.CustomerName
-	FROM Sales.Customers c
-	WHERE c.BuyingGroupID is Null) t1
-JOIN 
-	(SELECT i.CustomerID, COUNT(*) num_order
-	FROM Sales.Orders o
-	JOIN Sales.Invoices i
-	ON i.OrderID = o.OrderID
-	WHERE DATEDIFF(day, o.OrderDate, i.ConfirmedDeliveryTime) > 7
-	GROUP BY i.CustomerID) t2
-ON t1.CustomerID = t2.CustomerID
+(SELECT i.SalespersonPersonID, COUNT(*) num_delivery
+FROM Sales.Orders o
+JOIN Sales.Invoices i
+ON o.OrderID = i.OrderID
+WHERE DATEDIFF(day, o.OrderDate, i.ConfirmedDeliveryTime) > 7
+GROUP BY i.SalespersonPersonID) t1
+JOIN Application.People p
+ON t1.SalespersonPersonID = p.PersonID
 
 
 
 --3rd
+/*
 DECLARE @ColumnList VARCHAR(255)
 SET @ColumnList = NULL 
 
@@ -233,15 +231,14 @@ SET @SqlQuery =
 		ON ol.OrderID = o.OrderID
 		JOIN Warehouse.StockItemStockGroups sisg
 		ON ol.StockItemID = sisg.StockItemID
-		) source_table
+		) source_table+
 	PIVOT(
 		SUM(Quantity)
 		FOR years IN ('+@ColumnList+')
 		) pivot_table '
 
 EXEC(@SqlQuery)
-
-
+*/
 
 
 	
