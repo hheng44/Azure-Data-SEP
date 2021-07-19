@@ -216,6 +216,7 @@ DECLARE @ColumnList VARCHAR(255)
 SET @ColumnList = NULL 
 
 SELECT @ColumnList =  COALESCE( @ColumnList + ',', '') + QUOTENAME( DATEPART(yy, o.OrderDate)) 
+
 FROM Sales.Orders o
 GROUP BY DATEPART(yy, o.OrderDate)
 
@@ -231,7 +232,7 @@ SET @SqlQuery =
 		ON ol.OrderID = o.OrderID
 		JOIN Warehouse.StockItemStockGroups sisg
 		ON ol.StockItemID = sisg.StockItemID
-		) source_table+
+		) source_table
 	PIVOT(
 		SUM(Quantity)
 		FOR years IN ('+@ColumnList+')
