@@ -143,59 +143,59 @@ JOIN
 ON t3.StockGroupName = t4.StockGroupName
 */
 
-/*--14th
-SELECT t3.DeliveryCityID, t4.StockItemID, t3.max_num
-FROM 
-	(SELECT t1.DeliveryCityID, MAX(t1.total_received) max_num
-	FROM 
-		(SELECT c.DeliveryCityID, il.StockItemID, SUM(il.Quantity) total_received
-		FROM Sales.InvoiceLines il
-		JOIN Sales.Invoices i
-		ON i.InvoiceID = il.InvoiceID
-		JOIN Sales.Customers c
-		ON i.CustomerID = c.CustomerID
-		WHERE DATEPART(yy, i.ConfirmedDeliveryTime) = '2016' and JSON_VALUE (ReturnedDeliveryData, '$.Events[1].Status') IS NOT NULL
-		GROUP BY c.DeliveryCityID, il.StockItemID
-		) t1
+----14th
+--SELECT t3.DeliveryCityID, t4.StockItemID, t3.max_num
+--FROM 
+--	(SELECT t1.DeliveryCityID, MAX(t1.total_received) max_num
+--	FROM 
+--		(SELECT c.DeliveryCityID, il.StockItemID, SUM(il.Quantity) total_received
+--		FROM Sales.InvoiceLines il
+--		JOIN Sales.Invoices i
+--		ON i.InvoiceID = il.InvoiceID
+--		JOIN Sales.Customers c
+--		ON i.CustomerID = c.CustomerID
+--		WHERE DATEPART(yy, i.ConfirmedDeliveryTime) = '2016' and JSON_VALUE (ReturnedDeliveryData, '$.Events[1].Status') IS NOT NULL
+--		GROUP BY c.DeliveryCityID, il.StockItemID
+--		) t1
 
-	JOIN 
-		(
-		SELECT c.CityName, co.CountryName, sp.StateProvinceName, c.CityID
-		FROM Application.StateProvinces sp
-		JOIN Application.Countries co
-		ON sp.CountryID = co.CountryID AND co.CountryName = 'United States'
-		JOIN Application.Cities c
-		ON sp.StateProvinceID = c.StateProvinceID
-		) t2
+--	JOIN 
+--		(
+--		SELECT c.CityName, co.CountryName, sp.StateProvinceName, c.CityID
+--		FROM Application.StateProvinces sp
+--		JOIN Application.Countries co
+--		ON sp.CountryID = co.CountryID AND co.CountryName = 'United States'
+--		JOIN Application.Cities c
+--		ON sp.StateProvinceID = c.StateProvinceID
+--		) t2
 
-	ON t1.DeliveryCityID = t2.CityID
-	GROUP BY t1.DeliveryCityID) t3
+--	ON t1.DeliveryCityID = t2.CityID
+--	GROUP BY t1.DeliveryCityID) t3
 
-JOIN 
+--JOIN 
 
-	(SELECT t1.DeliveryCityID, t1.StockItemID
-	FROM 
-		(SELECT c.DeliveryCityID, il.StockItemID, SUM(il.Quantity) total_received
-		FROM Sales.InvoiceLines il
-		JOIN Sales.Invoices i
-		ON i.InvoiceID = il.InvoiceID
-		JOIN Sales.Customers c
-		ON i.CustomerID = c.CustomerID
-		WHERE DATEPART(yy, i.ConfirmedDeliveryTime) = '2016' and JSON_VALUE (ReturnedDeliveryData, '$.Events[1].Status') IS NOT NULL
-		) t1
+--	(SELECT t1.DeliveryCityID, t1.StockItemID
+--	FROM 
+--		(SELECT c.DeliveryCityID, il.StockItemID, SUM(il.Quantity) total_received
+--		FROM Sales.InvoiceLines il
+--		JOIN Sales.Invoices i
+--		ON i.InvoiceID = il.InvoiceID
+--		JOIN Sales.Customers c
+--		ON i.CustomerID = c.CustomerID
+--		WHERE DATEPART(yy, i.ConfirmedDeliveryTime) = '2016' and JSON_VALUE (ReturnedDeliveryData, '$.Events[1].Status') IS NOT NULL
+--		) t1
 
-	JOIN 
-		(SELECT c.CityName, co.CountryName, sp.StateProvinceName, c.CityID
-		FROM Application.StateProvinces sp
-		JOIN Application.Countries co
-		ON sp.CountryID = co.CountryID AND co.CountryName = 'United States'
-		JOIN Application.Cities c
-		ON sp.StateProvinceID = c.StateProvinceID
-		) t2
-	ON t1.DeliveryCityID = t2.CityID
-	) t4
-ON t3.DeliveryCityID = t4.DeliveryCityID
-*/
+--	JOIN 
+--		(SELECT c.CityName, co.CountryName, sp.StateProvinceName, c.CityID
+--		FROM Application.StateProvinces sp
+--		JOIN Application.Countries co
+--		ON sp.CountryID = co.CountryID AND co.CountryName = 'United States'
+--		JOIN Application.Cities c
+--		ON sp.StateProvinceID = c.StateProvinceID
+--		) t2
+--	ON t1.DeliveryCityID = t2.CityID
+--	) t4
+--ON t3.DeliveryCityID = t4.DeliveryCityID
+
 
 
 --15th
@@ -207,7 +207,7 @@ WHERE JSON_VALUE(ReturnedDeliveryData, '$.Events[1].Comment') IS NOT NULL
 
 --16th
 /*
-SELECT StockItemName, JSON_VALUE(CustomFields, '$.CountryOfManufacture')
+SELECT StockItemName, JSON_VALUE(CustomFields, '$.CountryOfManufacture') CountryOfManufacture
 FROM Warehouse.StockItems
 WHERE JSON_VALUE(CustomFields, '$.CountryOfManufacture') = 'China'
 */
@@ -243,6 +243,34 @@ PIVOT
 */
 
 --19th
+/*
+CREATE VIEW sales_per_group
+AS
+SELECT  Years, [T-Shirts],[USB Novelties],[Packaging Materials],
+							[Clothing],[Novelty Items],[Furry Footwear],[Mugs],
+							[Computing Novelties],[Toys]
+FROM 
+	(SELECT sg.StockGroupName, year(o.OrderDate) years, ol.Quantity
+	FROM Sales.OrderLines ol
+	JOIN Warehouse.StockItemStockGroups sisg
+	ON ol.StockItemID = sisg.StockItemID
+	JOIN Warehouse.StockGroups sg
+	ON sisg.StockGroupID = sg.StockGroupID
+	JOIN Sales.Orders o
+	ON o.OrderID = ol.OrderID
+	WHERE year(o.OrderDate) IN (2013, 2014, 2015, 2016, 2017) ) source_table
+PIVOT
+	(SUM(Quantity)
+	FOR StockGroupName IN ([T-Shirts],[USB Novelties],[Packaging Materials],
+							[Clothing],[Novelty Items],[Furry Footwear],[Mugs],
+							[Computing Novelties],[Toys])
+	) pivot_table
+
+*/
+
+
+--dynamic pivot but fail to create view
+
 /*CREATE VIEW sales_per_group
 AS 
 SELECT *
@@ -275,17 +303,291 @@ SET @SqlQuery =
 		FOR StockGroupName IN ('+@ColumnList+')
 		) pivot_table'
 
-EXEC(CREATE VIEW sales_per_group AS SELECT * FROM @SqlQuery)
+EXEC(@SqlQuery)
 */
 
 --20th
 
+----CREATE FUNCTION total_order(@OrderID INT)
+--ALTER FUNCTION total_order(@OrderID INT)
+--RETURNS INT
+--AS 
+
+--BEGIN
+--	DECLARE @ret INT
+--	SELECT @ret = ol.Quantity *ol.UnitPrice
+--	FROM Sales.Orders o
+--	JOIN Sales.OrderLines ol
+--	ON o.OrderID = ol.OrderID
+--	WHERE o.OrderID = @OrderID
+--		IF (@ret IS NULL)
+--			SET @ret = 0
+--	RETURN @ret
+--END
+
+
+--SELECT i.InvoiceID, o.OrderID, dbo.total_order(o.OrderID) order_total
+--FROM Sales.Orders o
+--JOIN Sales.Invoices i
+--ON o.OrderID = i.OrderID
+
+
+--21th
+/*
+--CREATE PROCEDURE dbo.order_info
+ALTER PROCEDURE dbo.order_info
+@OrderDate Date
+
+AS
+
+BEGIN TRY
+	BEGIN TRANSACTION
+
+		INSERT INTO table_of_21
+		SELECT * FROM 
+				(SELECT  o.OrderID, o.CustomerID, o.OrderDate, ol.Quantity*ol.UnitPrice order_total
+				FROM Sales.Orders o
+				JOIN Sales.OrderLines ol
+				ON o.OrderID = ol.OrderID
+				WHERE o.OrderDate = @OrderDate
+				) t1
+
+	COMMIT TRANSACTION
+END TRY
+BEGIN CATCH
+	SELECT
+    ERROR_NUMBER() AS ErrorNumber,
+    ERROR_STATE() AS ErrorState,
+    ERROR_SEVERITY() AS ErrorSeverity,
+    ERROR_PROCEDURE() AS ErrorProcedure,
+    ERROR_LINE() AS ErrorLine,
+    ERROR_MESSAGE() AS ErrorMessage;
+	--IF ERROR_NUMBER() = 2627
+	--	THROW 50000 , 'Duplicate date in DB', 1
+	--	ROLLBACK TRANSACTION
+	--IF ERROR_NUMBER() = 515
+	--	THROW 50001, 'NO order at that date', 1
+	--	ROLLBACK TRANSACTION
+END CATCH
+
+RETURN 
+GO 
+
+--EXEC dbo.order_info @OrderDate = '2013-01-01'
+
+
+CREATE TABLE table_of_21 
+(OrderID INT,
+CustomerID INT,
+OrderDate DATE,
+OrderTotal INt
+)
+
+EXEC dbo.order_info @OrderDate = '2013-01-01'
+EXEC dbo.order_info @OrderDate = '2014-01-01'
+*/
+
+
+
+--22th
+/*
+CREATE SCHEMA ods 
+	CREATE TABLE ods.StockItem
+	(StockItemID INT,
+	StockItemName NVARCHAR(100),
+	SupplierID INT,
+	ColorID INT,
+	UnitPackageID INT,
+	OuterPackageID INT,
+	Brand NVARCHAR(50),
+	Size NVARCHAR(20),
+	LeadTimeDays INT,
+	QuantityPerOuter INT,
+	IsChillerStock BIT,
+	Barcode NVARCHAR(50),
+	TaxRate DECIMAL(18,3),
+	UnitPrice DECIMAL(18,2),
+	RecommendedRetailPrice DECIMAL(18,2),
+	TypicalWeightPerUnit DECIMAL(18,3),
+	MarketingComments NVARCHAR(MAX),
+	InternalComments NVARCHAR(MAX), 
+	CountryOfManufacture NVARCHAR(MAX), 
+	Ranges DATETIME2, 
+	Shelflife DATETIME2 ,
+	CONSTRAINT pk_stock PRIMARY KEY (StockItemID)
+	)
+
+
+--DELETE FROM ods.StockItem
+
+INSERT INTO ods.StockItem
+SELECT StockItemID, StockItemName, SupplierID, ColorID, UnitPackageID, OuterPackageID,
+Brand, Size, LeadTimeDays, QuantityPerOuter, IsChillerStock, Barcode, TaxRate,
+UnitPrice, RecommendedRetailPrice, TypicalWeightPerUnit,MarketingComments, InternalComments, 
+JSON_VALUE(CustomFields, '$.CountryOfManufacture'), ValidFrom, ValidTo 
+FROM Warehouse.StockItems
+*/
+
+--23th
+
+
+--24th
+
+DECLARE @json NVARCHAR(MAX)
+SET @json = N'[
+      {
+         "StockItemName":"Panzer Video Game",
+         "Supplier":"7",
+         "UnitPackageId":"1",
+         "OuterPackageId":[6,7],
+         "Brand":"EA Sports",
+         "LeadTimeDays":"5",
+         "QuantityPerOuter":"1",
+         "TaxRate":"6",
+         "UnitPrice":"59.99",
+         "RecommendedRetailPrice":"69.99",
+         "TypicalWeightPerUnit":"0.5",
+         "CountryOfManufacture":"Canada",
+         "Range":"Adult",
+         "OrderDate":"2018-01-01",
+         "DeliveryMethod":"Post",
+         "ExpectedDeliveryDate":"2018-02-02",
+         "SupplierReference":"WWI2308"
+      },
+      {
+         "StockItemName":"Panzer Video Game",
+         "Supplier":"5",
+         "UnitPackageId":"1",
+         "OuterPackageId":[7],
+         "Brand":"EA Sports",
+         "LeadTimeDays":"5",
+         "QuantityPerOuter":"1",
+         "TaxRate":"6",
+         "UnitPrice":"59.99",
+         "RecommendedRetailPrice":"69.99",
+         "TypicalWeightPerUnit":"0.5",
+         "CountryOfManufacture":"Canada",
+         "Range":"Adult",
+         "OrderDate":"2018-01-025",
+         "DeliveryMethod":"Post",
+         "ExpectedDeliveryDate":"2018-02-02",
+         "SupplierReference":"269622390"
+      }
+   ]'
+
+
+
+SELECT *
+FROM OPENJSON (@json)
+	WITH 
+	(
+		StockItemName NVARCHAR(100) '$.StockItemName',
+		SupplierID INT '$.Supplier',
+		UnitPackageID INT '$.UnitPackageId',
+		OuterPackageId NVARCHAR(MAX) '$.OuterPackageId' AS JSON,
+		--OuterPackageID INT '$.OuterPackageId[1]' ,
+		Brand NVARCHAR(50) '$.Brand',
+		LeadTimeDays INT '$.LeadTimeDays',
+		QuantityPerOuter INT '$.QuantityPerOuter',
+		TaxRate DECIMAL(18,2) '$.TaxRate',
+		UnitPrice DECIMAL(18,3) '$.UnitPrice',
+		RecommendedRetailPrice DECIMAL(18,2) '$.RecommendedRetailPrice',
+		TypicalWeightPerUnit DECIMAL(18,3) '$.TypicalWeightPerUnit',
+		CountryOfManufacture NVARCHAR(50) '$.CountryOfManufacture',
+		Ranges NVARCHAR(50) '$.Range',
+		OrderDate DATETIME '$.OrderDate',
+		DeliveryMethod NVARCHAR(50) '$.DeliveryMethod',
+		ExpectedDeliveryDate DATETIME '$.ExpectedDeliveryDate',
+		SupplierReference NVARCHAR(100) '$.SupplierReference'
+	)
+OUTER APPLY OPENJSON (OuterPackageId)
+	WITH (OuterPackageID INT '$')
 
 
 
 
+INSERT INTO Warehouse.StockItems
+SELECT *
+FROM OPENJSON (@json)
+	WITH 
+	(
+		StockItemName NVARCHAR(100) '$.StockItemName',
+		SupplierID INT '$.Supplier',
+		UnitPackageID INT '$.UnitPackageId',
+		OuterPackageId NVARCHAR(MAX) '$.OuterPackageId' AS JSON,
+		--OuterPackageID INT '$.OuterPackageId[1]' ,
+		Brand NVARCHAR(50) '$.Brand',
+		LeadTimeDays INT '$.LeadTimeDays',
+		QuantityPerOuter INT '$.QuantityPerOuter',
+		TaxRate DECIMAL(18,2) '$.TaxRate',
+		UnitPrice DECIMAL(18,3) '$.UnitPrice',
+		RecommendedRetailPrice DECIMAL(18,2) '$.RecommendedRetailPrice',
+		TypicalWeightPerUnit DECIMAL(18,3) '$.TypicalWeightPerUnit',
+		CountryOfManufacture NVARCHAR(50) '$.CountryOfManufacture',
+		Ranges NVARCHAR(50) '$.Range',
+		OrderDate DATETIME '$.OrderDate',
+		DeliveryMethod NVARCHAR(50) '$.DeliveryMethod',
+		ExpectedDeliveryDate DATETIME '$.ExpectedDeliveryDate',
+		SupplierReference NVARCHAR(100) '$.SupplierReference'
+	)
+OUTER APPLY OPENJSON (OuterPackageId)
+	WITH (OuterPackageID INT '$')
 
 
 
 
+--25th
+/*
+SELECT years =  Years, 
+		Tshirt = [T-Shirts],
+		USBNovlties = [USB Novelties],
+		PackageMaterials = [Packaging Materials],
+		Clothing = [Clothing],
+		NoveltyItem = [Novelty Items],
+		FurryFootwear = [Furry Footwear],
+		Mugs = [Mugs],
+		ComputingNovlties = [Computing Novelties],
+		Toys = [Toys]
+FROM 
+	(SELECT sg.StockGroupName, year(o.OrderDate) years, ol.Quantity
+	FROM Sales.OrderLines ol
+	JOIN Warehouse.StockItemStockGroups sisg
+	ON ol.StockItemID = sisg.StockItemID
+	JOIN Warehouse.StockGroups sg
+	ON sisg.StockGroupID = sg.StockGroupID
+	JOIN Sales.Orders o
+	ON o.OrderID = ol.OrderID
+	WHERE year(o.OrderDate) IN (2013, 2014, 2015, 2016, 2017) ) source_table
+PIVOT
+	(SUM(Quantity)
+	FOR StockGroupName IN ([T-Shirts],[USB Novelties],[Packaging Materials],
+							[Clothing],[Novelty Items],[Furry Footwear],[Mugs],
+							[Computing Novelties],[Toys])
+	) pivot_table
+FOR JSON AUTO
+*/
 
+--26th
+/*
+SELECT  Years, [T-Shirts],[USB Novelties],[Packaging Materials],
+							[Clothing],[Novelty Items],[Furry Footwear],[Mugs],
+							[Computing Novelties],[Toys]
+FROM 
+	(SELECT sg.StockGroupName, year(o.OrderDate) years, ol.Quantity
+	FROM Sales.OrderLines ol
+	JOIN Warehouse.StockItemStockGroups sisg
+	ON ol.StockItemID = sisg.StockItemID
+	JOIN Warehouse.StockGroups sg
+	ON sisg.StockGroupID = sg.StockGroupID
+	JOIN Sales.Orders o
+	ON o.OrderID = ol.OrderID
+	WHERE year(o.OrderDate) IN (2013, 2014, 2015, 2016, 2017) ) source_table
+PIVOT
+	(SUM(Quantity)
+	FOR StockGroupName IN ([T-Shirts],[USB Novelties],[Packaging Materials],
+							[Clothing],[Novelty Items],[Furry Footwear],[Mugs],
+							[Computing Novelties],[Toys])
+	) pivot_table
+FOR XML AUTO
+*/
+--27th/*CREATE PROCEDURE ods.confirm_delivery@DateAS	SELECT 	FROM Sales.Invoices i	JOIN Sales.InvoiceLines il	ON i.InvoiceID = il.InvoiceID	RETURN GOC*/
