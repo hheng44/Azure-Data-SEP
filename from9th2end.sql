@@ -736,9 +736,9 @@ END
 --INTO 
 
 
-DECLARE @record NVARCHAR(MAX)
-
-SELECT @record = *
+/*
+SELECT INTO ods.temp_table
+SELECT *
 FROM Sales.Invoices i
 JOIN Sales.InvoiceLines il
 ON i.InvoiceID = il.InvoiceID
@@ -746,3 +746,33 @@ ORDER BY i.InvoiceID
 OFFSET 0 ROWS
 FETCH FIRST 1 ROWS ONLY
 FOR JSON AUTO
+
+
+
+
+CREATE TABLE #personAW(
+	PersonID INT PRIMARY KEY NOT NULL,
+	Fullname NVARCHAR(50) NOT NULL,
+	PreferredName NVARCHAR(100) NOT NULL,
+	IsPermittedToLogon bit NOT NULL,
+	LogoName NVARCHAR(50),
+	IsExternalLogonProvider bit NOT NULL,
+	HashedPassword VARBINARY(MAX),
+	IsSystemUser BIT NOT NULL,
+	IsEmployee BIT NOT NULL,
+	IsSalesperson BIT NOT NULL,
+	UserPreferences NVARCHAR(MAX),
+	PhoneNumber NVARCHAR(20), 
+	FaxNumber NVARCHAR(20),
+	EmailAddress NVARCHAR(20),
+	Photo VARBINARY(MAX),
+	CustomFields VARCHAR(MAX),
+	OtherLanguages NVARCHAR(MAX),
+	LastEditedBy INT NOT NULL,
+	ValidFrom DATETIME2 NOT NULL,
+	ValidTo DATETIME2 NOT NULL
+)
+GO
+*/
+
+
