@@ -144,57 +144,40 @@ ON t3.StockGroupName = t4.StockGroupName
 */
 
 ----14th
---SELECT t3.DeliveryCityID, t4.StockItemID, t3.max_num
---FROM 
---	(SELECT t1.DeliveryCityID, MAX(t1.total_received) max_num
---	FROM 
---		(SELECT c.DeliveryCityID, il.StockItemID, SUM(il.Quantity) total_received
---		FROM Sales.InvoiceLines il
---		JOIN Sales.Invoices i
---		ON i.InvoiceID = il.InvoiceID
---		JOIN Sales.Customers c
---		ON i.CustomerID = c.CustomerID
---		WHERE DATEPART(yy, i.ConfirmedDeliveryTime) = '2016' and JSON_VALUE (ReturnedDeliveryData, '$.Events[1].Status') IS NOT NULL
---		GROUP BY c.DeliveryCityID, il.StockItemID
---		) t1
+/*
+SELECT  t2.CityName, t2.StateProvinceName, t2.CountryName, COALESCE(t1.StockItemID, 'no sales') StockItemID, COALESCE(s.StockItemName,'no sales') StockItemName, COALESCE(t1.total_received, 'no sales') total_received_num
+FROM 
+	(
+		SELECT b.DeliveryCityID, StockItemID, total_received
+		FROM
+			(SELECT DeliveryCityID, StockItemID, total_received, RANK() OVER (PARTITION BY DeliveryCityID ORDER BY total_received DESC) ranks
+			FROM 
+				(SELECT c.DeliveryCityID, il.StockItemID, SUM(il.Quantity) total_received
+				FROM Sales.InvoiceLines il
+				JOIN Sales.Invoices i
+				ON i.InvoiceID = il.InvoiceID
+				JOIN Sales.Customers c
+				ON i.CustomerID = c.CustomerID
+				WHERE DATEPART(yy, i.ConfirmedDeliveryTime) = '2016' and JSON_VALUE (ReturnedDeliveryData, '$.Events[1].Status') IS NOT NULL
+				GROUP BY c.DeliveryCityID, il.StockItemID) a )b
+		WHERE b.ranks = 1
+	) t1
 
---	JOIN 
---		(
---		SELECT c.CityName, co.CountryName, sp.StateProvinceName, c.CityID
---		FROM Application.StateProvinces sp
---		JOIN Application.Countries co
---		ON sp.CountryID = co.CountryID AND co.CountryName = 'United States'
---		JOIN Application.Cities c
---		ON sp.StateProvinceID = c.StateProvinceID
---		) t2
+RIGHT JOIN
 
---	ON t1.DeliveryCityID = t2.CityID
---	GROUP BY t1.DeliveryCityID) t3
+	(SELECT c.CityName, co.CountryName, sp.StateProvinceName, c.CityID
+	FROM Application.StateProvinces sp
+	JOIN Application.Countries co
+	ON sp.CountryID = co.CountryID AND co.CountryName = 'United States'
+	JOIN Application.Cities c
+	ON sp.StateProvinceID = c.StateProvinceID) t2
 
---JOIN 
+ON t1.DeliveryCityID = t2.CityID
+JOIN Warehouse.StockItems s
+ON t1.StockItemID = s.StockItemID
+*/
 
---	(SELECT t1.DeliveryCityID, t1.StockItemID
---	FROM 
---		(SELECT c.DeliveryCityID, il.StockItemID, SUM(il.Quantity) total_received
---		FROM Sales.InvoiceLines il
---		JOIN Sales.Invoices i
---		ON i.InvoiceID = il.InvoiceID
---		JOIN Sales.Customers c
---		ON i.CustomerID = c.CustomerID
---		WHERE DATEPART(yy, i.ConfirmedDeliveryTime) = '2016' and JSON_VALUE (ReturnedDeliveryData, '$.Events[1].Status') IS NOT NULL
---		) t1
 
---	JOIN 
---		(SELECT c.CityName, co.CountryName, sp.StateProvinceName, c.CityID
---		FROM Application.StateProvinces sp
---		JOIN Application.Countries co
---		ON sp.CountryID = co.CountryID AND co.CountryName = 'United States'
---		JOIN Application.Cities c
---		ON sp.StateProvinceID = c.StateProvinceID
---		) t2
---	ON t1.DeliveryCityID = t2.CityID
---	) t4
---ON t3.DeliveryCityID = t4.DeliveryCityID
 
 
 
@@ -339,52 +322,59 @@ ALTER PROCEDURE dbo.order_info
 @OrderDate Date
 
 AS
-
-BEGIN TRY
-	BEGIN TRANSACTION
-
-		INSERT INTO table_of_21
-		SELECT * FROM 
-				(SELECT  o.OrderID, o.CustomerID, o.OrderDate, ol.Quantity*ol.UnitPrice order_total
-				FROM Sales.Orders o
-				JOIN Sales.OrderLines ol
-				ON o.OrderID = ol.OrderID
-				WHERE o.OrderDate = @OrderDate
-				) t1
-
-	COMMIT TRANSACTION
-END TRY
-BEGIN CATCH
-	SELECT
-    ERROR_NUMBER() AS ErrorNumber,
-    ERROR_STATE() AS ErrorState,
-    ERROR_SEVERITY() AS ErrorSeverity,
-    ERROR_PROCEDURE() AS ErrorProcedure,
-    ERROR_LINE() AS ErrorLine,
-    ERROR_MESSAGE() AS ErrorMessage;
-	--IF ERROR_NUMBER() = 2627
-	--	THROW 50000 , 'Duplicate date in DB', 1
-	--	ROLLBACK TRANSACTION
-	--IF ERROR_NUMBER() = 515
-	--	THROW 50001, 'NO order at that date', 1
-	--	ROLLBACK TRANSACTION
-END CATCH
-
-RETURN 
-GO 
-
---EXEC dbo.order_info @OrderDate = '2013-01-01'
+BEGIN
+	SET NOCOUNT ON
+	--SET XACT_ABORT ON
+	BEGIN TRY
+		BEGIN TRANSACTION
+			INSERT INTO table_of_21
+			SELECT * FROM 
+					(SELECT  o.OrderID, o.CustomerID, o.OrderDate, SUM(ol.Quantity*ol.UnitPrice) order_total
+					FROM Sales.Orders o
+					JOIN Sales.OrderLines ol
+					ON o.OrderID = ol.OrderID
+					WHERE o.OrderDate = @OrderDate
+					GROUP BY  o.OrderID, o.CustomerID, o.OrderDate
+					) t1
+		COMMIT TRANSACTION
+	END TRY
+	BEGIN CATCH
+		SELECT
+		ERROR_NUMBER() AS ErrorNumber,
+		ERROR_STATE() AS ErrorState,
+		ERROR_SEVERITY() AS ErrorSeverity,
+		ERROR_PROCEDURE() AS ErrorProcedure,
+		ERROR_LINE() AS ErrorLine,
+		ERROR_MESSAGE() AS ErrorMessage
+		--IF ERROR_NUMBER() = 2627
+		--	THROW 50000 , 'Duplicate date in DB', 1
+		--	ROLLBACK TRANSACTION
+		--IF ERROR_NUMBER() = 515
+		--	THROW 50001, 'NO order at that date', 1
+		--	ROLLBACK TRANSACTION
+	END CATCH
+END
 
 
-CREATE TABLE table_of_21 
-(OrderID INT,
-CustomerID INT,
-OrderDate DATE,
-OrderTotal INt
-)
+--CREATE TABLE table_of_21 
+--(OrderID INT,
+--CustomerID INT,
+--OrderDate DATE,
+--OrderTotal INt
+--)
+
+DELETE 
+FROM table_of_21
+
+SELECT *
+FROM table_of_21
+
 
 EXEC dbo.order_info @OrderDate = '2013-01-01'
 EXEC dbo.order_info @OrderDate = '2014-01-01'
+EXEC dbo.order_info @OrderDate = '2015-01-01'
+EXEC dbo.order_info @OrderDate = '2016-01-01'
+EXEC dbo.order_info @OrderDate = '2017-01-01'
 */
 
 
@@ -429,10 +419,68 @@ FROM Warehouse.StockItems
 */
 
 --23th
+/*
+CREATE PROCEDURE dbo.order_info_wipe
+--ALTER PROCEDURE dbo.order_info_23
+@OrderDate Date
+
+AS
+BEGIN
+	SET NOCOUNT ON
+	--SET XACT_ABORT ON
+	BEGIN TRY
+		BEGIN TRANSACTION
+			DELETE 
+			FROM table_of_21
+			WHERE OrderDate < @OrderDate
+			
+			INSERT INTO table_of_21
+			SELECT * FROM 
+					(SELECT  o.OrderID, o.CustomerID, o.OrderDate, SUM(ol.Quantity*ol.UnitPrice) order_total
+					FROM Sales.Orders o
+					JOIN Sales.OrderLines ol
+					ON o.OrderID = ol.OrderID
+					WHERE o.OrderDate > @OrderDate AND o.OrderDate < DATEADD(day, 7, @OrderDate)
+					GROUP BY  o.OrderID, o.CustomerID, o.OrderDate
+					) t1
+		COMMIT TRANSACTION
+	END TRY
+	BEGIN CATCH
+		SELECT
+		ERROR_NUMBER() AS ErrorNumber,
+		ERROR_STATE() AS ErrorState,
+		ERROR_SEVERITY() AS ErrorSeverity,
+		ERROR_PROCEDURE() AS ErrorProcedure,
+		ERROR_LINE() AS ErrorLine,
+		ERROR_MESSAGE() AS ErrorMessage
+	END CATCH
+END
+
+EXEC dbo.order_info_wipe @OrderDate = '2014-01-01'
+
+*/
+
+
+--SELECT *
+--FROM table_of_21
+
+--DELETE 
+--FROM table_of_21
+--WHERE OrderDate < '2014-01-01'
+			
+--INSERT INTO table_of_21
+--SELECT * FROM 
+--		(SELECT  o.OrderID, o.CustomerID, o.OrderDate, SUM(ol.Quantity*ol.UnitPrice) order_total
+--		FROM Sales.Orders o
+--		JOIN Sales.OrderLines ol
+--		ON o.OrderID = ol.OrderID
+--		WHERE o.OrderDate BETWEEN '2014-01-02' AND DATEADD(day, 7, '2014-01-01')
+--		GROUP BY  o.OrderID, o.CustomerID, o.OrderDate
+--		) t1
 
 
 --24th
-
+/*
 DECLARE @json NVARCHAR(MAX)
 SET @json = N'[
       {
@@ -458,7 +506,7 @@ SET @json = N'[
          "StockItemName":"Panzer Video Game",
          "Supplier":"5",
          "UnitPackageId":"1",
-         "OuterPackageId":[7],
+         "OuterPackageId":7,
          "Brand":"EA Sports",
          "LeadTimeDays":"5",
          "QuantityPerOuter":"1",
@@ -477,6 +525,14 @@ SET @json = N'[
 
 
 
+
+--DECLARE @count INT
+--SET @count = 1
+
+--WHILE (@count<=2)
+--BEGIN
+
+
 SELECT *
 FROM OPENJSON (@json)
 	WITH 
@@ -484,7 +540,7 @@ FROM OPENJSON (@json)
 		StockItemName NVARCHAR(100) '$.StockItemName',
 		SupplierID INT '$.Supplier',
 		UnitPackageID INT '$.UnitPackageId',
-		OuterPackageId NVARCHAR(MAX) '$.OuterPackageId' AS JSON,
+		OuterPackageId NVARCHAR(MAX) '$.OuterPackageId', 
 		--OuterPackageID INT '$.OuterPackageId[1]' ,
 		Brand NVARCHAR(50) '$.Brand',
 		LeadTimeDays INT '$.LeadTimeDays',
@@ -500,12 +556,14 @@ FROM OPENJSON (@json)
 		ExpectedDeliveryDate DATETIME '$.ExpectedDeliveryDate',
 		SupplierReference NVARCHAR(100) '$.SupplierReference'
 	)
-OUTER APPLY OPENJSON (OuterPackageId)
-	WITH (OuterPackageID INT '$')
+OUTER APPLY OPENJSON(OuterPackageId)
+*/
 
 
 
 
+
+/*
 INSERT INTO Warehouse.StockItems
 SELECT *
 FROM OPENJSON (@json)
@@ -532,7 +590,7 @@ FROM OPENJSON (@json)
 	)
 OUTER APPLY OPENJSON (OuterPackageId)
 	WITH (OuterPackageID INT '$')
-
+*/
 
 
 
@@ -590,4 +648,101 @@ PIVOT
 	) pivot_table
 FOR XML AUTO
 */
---27th/*CREATE PROCEDURE ods.confirm_delivery@DateAS	SELECT 	FROM Sales.Invoices i	JOIN Sales.InvoiceLines il	ON i.InvoiceID = il.InvoiceID	RETURN GOC*/
+
+--27th
+
+CREATE PROCEDURE ods.confirm_delivery
+@InvoiceDate DATE
+
+AS
+BEGIN
+
+	INSERT INTO ods.ConfirmedDeviveryJson (id, dates, value)
+	VALUES ()
+	SELECT *
+	FROM Sales.Invoices i
+	JOIN Sales.InvoiceLines il
+	ON i.InvoiceID = il.InvoiceID
+	WHERE i.CustomerID = 1 and i.InvoiceDate = @InvoiceDate
+	FOR JSON AUTO
+
+
+END
+
+
+
+
+
+--CREATE TABLE ods.ConfirmedDeviveryJson (
+--	id INT,
+--	dates DATE,
+--	value NVARCHAR(MAX)
+--	CONSTRAINT delivery_id PRIMARY KEY (id)
+--)
+
+
+
+
+
+--SELECT *
+--FROM Sales.Invoices i
+--JOIN Sales.InvoiceLines il
+--ON i.InvoiceID = il.InvoiceID
+--WHERE i.CustomerID = 1 
+
+
+DECLARE @row_count INT, @current_row INT
+ SELECT @row_count= COUNT(*)
+FROM Sales.Invoices i
+JOIN Sales.InvoiceLines il
+ON i.InvoiceID = il.InvoiceID
+WHERE i.CustomerID = 1 
+
+SET @current_row = 0
+
+WHILE @row_count > 1
+BEGIN
+	SELECT *
+	FROM Sales.Invoices i
+	JOIN Sales.InvoiceLines il
+	ON i.InvoiceID = il.InvoiceID
+	ORDER BY i.InvoiceID
+	OFFSET @current_row ROWS
+	FETCH FIRST 1 ROWS ONLY
+	FOR JSON AUTO
+
+	INSERT ods.ConfirmedDeviveryJson
+	SELECT JSON_VALUE()
+
+	SET @current_row = @current_row + 1
+	SET @row_count = @row_count - 1
+END
+
+
+
+
+--DECLARE @id INT, @dates DATE, @values NVARCHAR(MAX) 
+
+--DECLARE record_cursor CURSOR FOR 
+--SELECT *
+--FROM Sales.InvoiceLines il
+--JOIN Sales.Invoices i 
+--ON il.InvoiceID = i.InvoiceID
+--WHERE i.CustomerID = 1
+
+--OPEN record_cursor
+
+--FETCH NEXT FROM record_cursor
+--INTO 
+
+
+DECLARE @record NVARCHAR(MAX)
+
+SELECT @record = *
+FROM Sales.Invoices i
+JOIN Sales.InvoiceLines il
+ON i.InvoiceID = il.InvoiceID
+ORDER BY i.InvoiceID
+OFFSET 0 ROWS
+FETCH FIRST 1 ROWS ONLY
+FOR JSON AUTO
